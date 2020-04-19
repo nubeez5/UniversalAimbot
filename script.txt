@@ -1,0 +1,906 @@
+local windowMinimized = false
+
+local windowWidth = 350
+local windowHeight = 230
+
+local guiParent = game.CoreGui
+
+
+-- Keybinds
+local aimbot_Key = Enum.KeyCode.LeftControl
+
+
+
+
+
+
+
+-- Other Variables
+local localPlayer = game.Players.LocalPlayer
+local rng = Random.new()
+
+local inputService = game:GetService("UserInputService")
+
+
+local original_CamMinZoom = 0
+local original_CamMaxZoom = 1024
+
+-- States
+local scriptEnabled = true
+local aimbotEnabled = false
+
+-- Functions
+local function SendNotification(title, text)
+	game.StarterGui:SetCore("SendNotification", {Title = title, Text = text})
+end
+
+local function DrawLine(ip1, ip2, thickness, transparency, color, parent)
+	local xSize = workspace.CurrentCamera.ViewportSize.X
+	local ySize = workspace.CurrentCamera.ViewportSize.Y - 36
+	
+	local p1, onScreen1 = workspace.CurrentCamera:WorldToScreenPoint(ip1)
+	local p2, onScreen2 = workspace.CurrentCamera:WorldToScreenPoint(ip2)
+	
+	p1 = Vector2.new(p1.X, p1.Y)
+	p2 = Vector2.new(p2.X, p2.Y)
+	
+	if onScreen1 and onScreen2 then
+		local v = p2 - p1
+		
+		local line = Instance.new("Frame", parent)
+		line.Name = "Line"
+		line.BackgroundColor3 = color
+		line.BackgroundTransparency = transparency
+		line.BorderSizePixel = 0
+		line.Size = UDim2.new(0, v.Magnitude + 1, 0, thickness)
+		line.Position = UDim2.new(((p1.X + (v.X / 2)) - (line.AbsoluteSize.X / 2)) / xSize, 0, 
+								  ((p1.Y + (v.Y / 2)) - (line.AbsoluteSize.Y / 2)) / ySize, 0)
+		line.Rotation = math.deg(math.atan2(v.Y, v.X))
+		
+		return line
+	end
+end
+
+local function RandomString(length)
+	local str = ""
+	local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567890"
+	
+	for i = 1, length do
+		local index = rng:NextInteger(1, string.len(chars))
+		str = str .. string.sub(chars, index, index)
+	end
+	
+	return str
+end
+
+local function TextToNumber(text)
+	return typeof(tonumber(text)) == "number" and tonumber(text) or 0
+end
+
+local function TeleportToCamera(args)
+	if game.Players.LocalPlayer.Character then
+		game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(workspace.CurrentCamera.CFrame)
+	end
+end
+
+-- Create Gui
+local gui = Instance.new("ScreenGui", guiParent)
+gui.Name = RandomString(50)
+gui.ResetOnSpawn = false
+
+local espGui = Instance.new("ScreenGui", guiParent)
+espGui.Name = RandomString(50)
+espGui.ResetOnSpawn = false
+
+local tempStorage = Instance.new("Folder", espGui)
+tempStorage.Name = "TempStorage"
+
+local mouseIcon = Instance.new("Frame", gui)
+mouseIcon.Name = "MouseIcon"
+mouseIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+mouseIcon.Size = UDim2.new(0, 3, 0, 3)
+mouseIcon.BorderSizePixel = 0
+mouseIcon.BackgroundColor3 = Color3.new(1, 1, 1)
+mouseIcon.Rotation = 45
+mouseIcon.ZIndex = 100
+mouseIcon.Visible = false
+
+local espHitboxImage_Template = Instance.new("ImageLabel")
+espHitboxImage_Template.Name = "ESP_HitboxImage"
+espHitboxImage_Template.Image = "rbxassetid://4835217542"
+espHitboxImage_Template.ScaleType = Enum.ScaleType.Slice
+espHitboxImage_Template.SliceCenter = Rect.new(4, 4, 508, 508)
+espHitboxImage_Template.SliceScale = 0.5
+espHitboxImage_Template.BackgroundTransparency = 1
+espHitboxImage_Template.BorderSizePixel = 0
+espHitboxImage_Template.AnchorPoint = Vector2.new(0.5, 0.5)
+
+
+local frame = Instance.new("ImageLabel", gui)
+frame.Name = "Background"
+frame.Image = "rbxassetid://3570695787"
+frame.ImageColor3 = Color3.fromRGB(60, 60, 60)
+frame.ScaleType = Enum.ScaleType.Slice
+frame.SliceCenter = Rect.new(Vector2.new(100, 100), Vector2.new(100, 100))
+frame.SliceScale = 0.04
+frame.Size = UDim2.new(0, windowWidth, 0, windowHeight)
+frame.BackgroundTransparency = 1
+frame.BorderSizePixel = 0
+frame.Active = true
+
+local dragHandle = Instance.new("TextButton", frame)
+dragHandle.Name = "DragHandle"
+dragHandle.BackgroundTransparency = 1
+dragHandle.Size = UDim2.new(1, 0, 0, 18)
+dragHandle.Position = UDim2.new(0, 0, 0, 1)
+dragHandle.Text = ""
+
+local closeButton = Instance.new("ImageButton", dragHandle)
+closeButton.Name = "CloseButton"
+closeButton.Image = "rbxassetid://4389749368"
+closeButton.Size = UDim2.new(0, 12, 0, 12)
+closeButton.AnchorPoint = Vector2.new(0, 0.5)
+closeButton.BackgroundTransparency = 1
+closeButton.AutoButtonColor = false
+closeButton.Position = UDim2.new(1, -18, 0.5, -1)
+
+local miniButton = Instance.new("ImageButton", dragHandle)
+miniButton.Name = "MinimizeButton"
+miniButton.Image = "rbxassetid://4530358017"
+miniButton.Size = UDim2.new(0, 12, 0, 12)
+miniButton.AnchorPoint = Vector2.new(0, 0.5)
+miniButton.BackgroundTransparency = 1
+miniButton.AutoButtonColor = false
+miniButton.Position = UDim2.new(1, -37, 0.5, -1)
+
+local title = Instance.new("TextLabel", frame)
+title.Name = "Title"
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, 0, 0, 16)
+title.Font = Enum.Font.GothamSemibold
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextSize = 16
+title.Position = UDim2.new(0, 8, 0, 1)
+title.Text = "Universal Aimbot/ESP"
+
+local titleBorder = Instance.new("Frame", frame)
+titleBorder.Name = "TitleBorder"
+titleBorder.Size = UDim2.new(1, 0, 0, 1)
+titleBorder.Position = UDim2.new(0.5, 0, 0, 18)
+titleBorder.AnchorPoint = Vector2.new(0.5, 0)
+titleBorder.BorderSizePixel = 0
+
+local titleBorder_Gradient = Instance.new("UIGradient", titleBorder)
+titleBorder.BackgroundColor3 = Color3.new(1, 1, 1)
+titleBorder_Gradient.Transparency = NumberSequence.new{
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.05, 0.5),
+	NumberSequenceKeypoint.new(0.95, 0.5),
+	NumberSequenceKeypoint.new(1, 1)
+}
+
+local options = Instance.new("ScrollingFrame", frame)
+options.Name = "Options"
+options.AnchorPoint = Vector2.new(0, 1)
+options.Position = UDim2.new(0, 0, 1, 0)
+options.Size = UDim2.new(1, 0, 1, -21)
+options.BackgroundTransparency = 1
+options.ScrollBarThickness = 0
+options.CanvasSize = UDim2.new(0, 0, 0, 10000)
+options.BorderSizePixel = 0
+options.ScrollingEnabled = false
+options.Active = true
+
+local options_List = Instance.new("UIListLayout", options)
+options_List.SortOrder = Enum.SortOrder.LayoutOrder
+options_List.Padding = UDim.new(0, 2)
+
+-- Options Templates
+local option_Template = Instance.new("Frame")
+option_Template.Name = "OptionTemplate"
+option_Template.BackgroundTransparency = 1
+option_Template.BorderSizePixel = 0
+option_Template.Size = UDim2.new(1, 0, 0, 18)
+
+local option_Template_Title = Instance.new("TextButton", option_Template)
+option_Template_Title.Name = "Title"
+option_Template_Title.Position = UDim2.new(0, 14, 0, 0)
+option_Template_Title.Size = UDim2.new(0.4, 0, 1, 0)
+option_Template_Title.BackgroundTransparency = 1
+option_Template_Title.BorderSizePixel = 0
+option_Template_Title.Font = Enum.Font.Gotham
+option_Template_Title.TextSize = 14
+option_Template_Title.TextXAlignment = Enum.TextXAlignment.Left
+option_Template_Title.TextColor3 = Color3.new(1, 1, 1)
+option_Template_Title.Text = "Option Template"
+
+local option_Template_Value = Instance.new("ImageLabel")
+option_Template_Value.Name = "OptionValueBackground"
+option_Template_Value.Image = "rbxassetid://3570695787"
+option_Template_Value.ImageColor3 = Color3.fromRGB(45, 45, 45)
+option_Template_Value.ScaleType = Enum.ScaleType.Slice
+option_Template_Value.SliceCenter = Rect.new(Vector2.new(100, 100), Vector2.new(100, 100))
+option_Template_Value.SliceScale = 0.025
+option_Template_Value.Size = UDim2.new(0, 30, 1, 0)
+option_Template_Value.BackgroundTransparency = 1
+option_Template_Value.BorderSizePixel = 0
+
+local option_Template_Value_TextBox = Instance.new("TextBox", option_Template_Value)
+option_Template_Value_TextBox.Name = "OptionValue"
+option_Template_Value_TextBox.BackgroundTransparency = 1
+option_Template_Value_TextBox.Size = UDim2.new(1, 0, 1, 0)
+option_Template_Value_TextBox.Text = "N/A"
+option_Template_Value_TextBox.TextColor3 = Color3.new(1, 1, 1)
+option_Template_Value_TextBox.TextSize = 13
+option_Template_Value_TextBox.Font = Enum.Font.GothamSemibold
+
+-- Options
+local function CreateValue(parent, sizeX, positionX)
+	local value = option_Template_Value:Clone()
+	value.Parent = parent
+	value.Position = UDim2.new(0, positionX, 0, 0)
+	value.Size = UDim2.new(0, sizeX, 1, 0)
+	
+	return value.OptionValue
+end
+
+local function CreateButton(parent, sizeX, positionX, t, functionToCall)
+	local value = Instance.new("ImageButton", parent)
+	value.Name = "DropdownMenuBackground"
+	value.Image = "rbxassetid://3570695787"
+	value.ImageColor3 = Color3.fromRGB(45, 45, 45)
+	value.ScaleType = Enum.ScaleType.Slice
+	value.Position = UDim2.new(0, positionX, 0, 0)
+	value.SliceCenter = Rect.new(Vector2.new(100, 100), Vector2.new(100, 100))
+	value.SliceScale = 0.025
+	value.Size = UDim2.new(0, sizeX, 1, 0)
+	value.BackgroundTransparency = 1
+	value.BorderSizePixel = 0
+	value.ZIndex = 3
+	
+	local text = Instance.new("TextButton", value)
+	text.Name = "ChosenValue"
+	text.BackgroundTransparency = 1
+	text.BorderSizePixel = 0
+	text.AutoButtonColor = false
+	text.TextColor3 = Color3.new(1, 1, 1)
+	text.Font = Enum.Font.GothamSemibold
+	text.TextSize = 13
+	text.Text = t
+	text.Size = UDim2.new(1, 0, 1, 0)
+	text.Position = UDim2.new(0, 0, 0, 0)
+	text.ZIndex = 3
+	
+	text.MouseEnter:Connect(function()
+		value.ImageColor3 = Color3.fromRGB(65, 65, 65)
+	end)
+	
+	text.MouseLeave:Connect(function()
+		value.ImageColor3 = Color3.fromRGB(45, 45, 45)
+	end)
+	
+	text.MouseButton1Click:Connect(function()
+		functionToCall()
+	end)
+end
+
+local function CreateSlider(parent, sizeX, positionX, value1, value2, secondIsDefault)
+	local sliderOption = secondIsDefault == true and 1 or 0
+	
+	local frame = option_Template_Value:Clone()
+	frame.Parent = parent
+	frame.Position = UDim2.new(0, positionX, 0, 0)
+	frame.Size = UDim2.new(0, sizeX, 1, 0)
+	frame.OptionValue:Destroy()
+	
+	local clickBox = Instance.new("ImageButton", parent)
+	clickBox.Position = UDim2.new(0, positionX, 0, 0)
+	clickBox.Size = UDim2.new(0, sizeX, 1, 0)
+	clickBox.BackgroundTransparency = 1
+	
+	local slider = option_Template_Value:Clone()
+	slider.Parent = frame
+	slider.Position = UDim2.new(0, 0, 0, 0)
+	slider.Size = UDim2.new(0.5, 0, 1, 0)
+	slider.ImageColor3 = Color3.new(0.9, 0.9, 0.9)
+	slider.ZIndex = 2
+	slider.Active = false
+	slider.OptionValue:Destroy()
+	
+	
+	local option_1 = Instance.new("TextLabel", frame)
+	option_1.Size = UDim2.new(0.5, 0, 1, 0)
+	option_1.Position = UDim2.new(0, 0, 0, 0)
+	option_1.BackgroundTransparency = 1
+	option_1.Font = Enum.Font.GothamSemibold
+	option_1.TextSize = 13
+	option_1.TextColor3 = Color3.new(1, 1, 1)
+	option_1.Text = value1
+	
+	local option_2 = option_1:Clone()
+	option_2.Parent = frame
+	option_2.Position = UDim2.new(0.5, 0, 0, 0)
+	option_2.Text = value2
+	
+	local function Check()
+		if sliderOption == 1 then
+			sliderOption = 0
+			
+			local goal = {}
+			goal.Position = UDim2.new(0.5, 0, 0, 0)
+			
+			local info = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut)
+			local tween = game:GetService("TweenService"):Create(slider, info, goal)
+			tween:Play()
+		elseif sliderOption == 0 then
+			sliderOption = 1
+			
+			local goal = {}
+			goal.Position = UDim2.new(0, 0, 0, 0)
+			
+			local info = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut)
+			local tween = game:GetService("TweenService"):Create(slider, info, goal)
+			tween:Play()
+		end
+	end
+	
+	Check()
+	
+	clickBox.MouseButton1Click:Connect(function()
+		Check()
+	end)
+	
+	local t = {}
+	function t.GetValue()
+		if sliderOption == 0 then
+			return value1
+		else
+			return value2
+		end
+	end
+	
+	function t.ChangeValue(v)
+		sliderOption = v
+		
+		Check()
+	end
+	
+	return t
+end
+
+local function CreateDropdownMenu(parent, sizeX, positionX, values)
+	local menuOpen = false
+	local selectedOption = 0
+	
+	local valueOriginalHeight = parent.AbsoluteSize.Y
+	
+	
+	local value = Instance.new("ImageLabel", parent)
+	value.Name = "DropdownMenuBackground"
+	value.Image = "rbxassetid://3570695787"
+	value.ImageColor3 = Color3.fromRGB(45, 45, 45)
+	value.ScaleType = Enum.ScaleType.Slice
+	value.Position = UDim2.new(0, positionX, 0, 0)
+	value.SliceCenter = Rect.new(Vector2.new(100, 100), Vector2.new(100, 100))
+	value.SliceScale = 0.025
+	value.Size = UDim2.new(0, sizeX, 1, 0)
+	value.BackgroundTransparency = 1
+	value.BorderSizePixel = 0
+	value.ZIndex = 3
+	value.Active = true
+	value.Selectable = true
+	
+	local chosenValue = Instance.new("TextButton", value)
+	chosenValue.Name = "ChosenValue"
+	chosenValue.BackgroundTransparency = 1
+	chosenValue.BorderSizePixel = 0
+	chosenValue.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+	chosenValue.AutoButtonColor = false
+	chosenValue.TextColor3 = Color3.new(1, 1, 1)
+	chosenValue.Font = Enum.Font.GothamSemibold
+	chosenValue.TextSize = 15
+	chosenValue.Text = values[1]
+	chosenValue.Size = UDim2.new(1, 0, 0, valueOriginalHeight)
+	chosenValue.Position = UDim2.new(0, 0, 0, 0)
+	chosenValue.ZIndex = 3
+	
+	local valueButtons = {}
+	
+	local function Check()
+		menuOpen = not menuOpen
+		
+		if menuOpen then
+			value.Size = UDim2.new(0, sizeX, 1, valueOriginalHeight * #values)
+			for _, v in pairs(valueButtons) do v.Visible = true end
+		else
+			value.Size = UDim2.new(0, sizeX, 1, 0)
+			for _, v in pairs(valueButtons) do v.Visible = false end
+		end
+	end
+	
+	for i, v in pairs(values) do
+		local newValue = chosenValue:Clone()
+		newValue.Name = "Option_" .. v
+		newValue.Parent = value
+		newValue.Position = UDim2.new(0, 0, 0, valueOriginalHeight * i)
+		newValue.TextSize = 12
+		newValue.Font = Enum.Font.GothamSemibold
+		newValue.Text = v
+		newValue.Visible = false
+		
+		table.insert(valueButtons, newValue)
+		
+		newValue.MouseButton1Click:Connect(function()
+			chosenValue.Text = v
+			selectedOption = i - 1
+			
+			Check()
+		end)
+		
+		newValue.MouseEnter:Connect(function()
+			local goal = {}
+			goal.BackgroundTransparency = 0.5
+			
+			local info = TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut)
+			local tween = game:GetService("TweenService"):Create(newValue, info, goal)
+			tween:Play()
+		end)
+			
+		newValue.MouseLeave:Connect(function()
+			local goal = {}
+			goal.BackgroundTransparency = 1
+			
+			local info = TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut)
+			local tween = game:GetService("TweenService"):Create(newValue, info, goal)
+			tween:Play()
+		end)
+	end
+	
+	
+	chosenValue.MouseButton1Click:Connect(function()
+		Check()
+	end)
+	
+	local t = {}
+	function t.GetValue()
+		return chosenValue.Text
+	end
+	
+	return t
+end
+
+local function CreateOption(parent, name, text)
+	local option = option_Template:Clone()
+	option.Name = name
+	option.Parent = options
+	option.Title.Text = text
+	
+	return option
+end
+
+local function AddPadding(parent, size, text)
+	local padding = Instance.new("TextButton", parent)
+	padding.Name = "Padding"
+	padding.BackgroundTransparency = 1
+	padding.BorderSizePixel = 0
+	padding.Size = UDim2.new(1, 0, 0, size)
+	padding.Font = Enum.Font.GothamSemibold
+	padding.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+	padding.TextSize = 12
+	padding.TextXAlignment = Enum.TextXAlignment.Left
+	padding.TextYAlignment = Enum.TextYAlignment.Bottom
+	padding.Text = "   " .. text
+	
+	return padding
+end
+
+local function ToggleOptionEvent(button, value)
+	button.MouseButton1Click:Connect(function()
+		_G[value] = not _G[value]
+		
+		if _G[value] then
+			button.TextColor3 = Color3.new(1, 0.7, 0.4)
+			button.Font = Enum.Font.GothamSemibold
+		else
+			button.TextColor3 = Color3.new(1, 1, 1)
+			button.Font = Enum.Font.Gotham
+		end
+	end)
+end
+
+-- Aim
+inputService.InputBegan:Connect(function(key)
+	if key.KeyCode == aimbot_Key then
+		aimbotEnabled = true
+	end
+end)
+
+inputService.InputEnded:Connect(function(key)
+	if key.KeyCode == aimbot_Key then
+		aimbotEnabled = false
+	end
+end)
+
+
+
+
+
+
+
+-- Title
+AddPadding(options, 14, "ESP")
+
+
+local option_ESP_Enabled = CreateOption(options, "ESP_Enabled", "Enabled")
+local option_ESP_Enabled_Slider = CreateSlider(option_ESP_Enabled, 130, 205, "True", "False", false)
+
+-- Refresh Rate
+AddPadding(options, 4, "")
+
+local option_ESP_Line_RefreshRate = CreateOption(options, "ESP_Line_RefreshRate", "Refresh Rate [ms]")
+local option_ESP_Line_RefreshRate_Value = CreateValue(option_ESP_Line_RefreshRate, 130, 205)
+
+option_ESP_Line_RefreshRate_Value.Text = 1
+
+-- Name Tags Enabled
+local option_ESP_NameTag = CreateOption(options, "ESP_NameTag", "Name Tags Enabled")
+local option_ESP_NameTag_Slider = CreateSlider(option_ESP_NameTag, 130, 205, "True", "False", true)
+
+local option_ESP_Tracers_Enabled = CreateOption(options, "ESP_Tracers", "Tracers Enabled")
+local option_ESP_Tracers_Enabled_Slider = CreateSlider(option_ESP_Tracers_Enabled, 130, 205, "True", "False", false)
+
+-- Aimbot
+AddPadding(options, 4, "")
+AddPadding(options, 14, "Aimbot")
+
+local option_AimbotEnabled = CreateOption(options, "ESP_AimbotEnabled", "Enabled")
+local option_AimbotEnabled_Slider = CreateSlider(option_AimbotEnabled, 130, 205, "True", "False", false)
+
+local option_TeamCheckEnabled = CreateOption(options, "ESP_TeamCheck", "Team Check Enabled")
+local option_TeamCheckEnabled_Slider = CreateSlider(option_TeamCheckEnabled, 130, 205, "True", "False", false)
+
+
+-- Extra Info
+AddPadding(options, 40, "")
+AddPadding(options, 10, "Extra Info")
+
+CreateOption(options, "CreatedBy", "Created by henrynguyen2163#9302")
+
+-- Resize
+options.CanvasSize = UDim2.new(0, 0, 0, options_List.AbsoluteContentSize.Y + 5)
+
+-- Dragging Menu
+local dragging = false
+local mouse = localPlayer:GetMouse()
+
+dragHandle.MouseButton1Down:Connect(function()
+	dragging = true
+	
+	local dragStartOffset = Vector2.new(mouse.X, mouse.Y) - frame.AbsolutePosition
+	
+	repeat
+		frame.Position = UDim2.new(0, mouse.X - dragStartOffset.X, 0, mouse.Y - dragStartOffset.Y)
+		
+		game:GetService("RunService").RenderStepped:Wait()
+	until dragging == false
+end)
+
+dragHandle.MouseButton1Up:Connect(function()
+	dragging = false
+end)
+
+-- Mouse Icon
+frame.MouseEnter:Connect(function()
+	mouseIcon.Visible = true
+	
+	local currentZoom = (workspace.CurrentCamera.Focus.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
+	localPlayer.CameraMinZoomDistance = currentZoom
+	localPlayer.CameraMaxZoomDistance = currentZoom
+	
+	repeat
+		mouseIcon.Position = UDim2.new(0, mouse.X, 0, mouse.Y)
+		
+		game:GetService("RunService").RenderStepped:Wait()
+	until mouseIcon.Visible == false
+end)
+
+frame.MouseLeave:Connect(function()
+	mouseIcon.Visible = false
+	
+	localPlayer.CameraMinZoomDistance = original_CamMinZoom
+	localPlayer.CameraMaxZoomDistance = original_CamMaxZoom
+end)
+
+-- Custom Scrolling
+frame.MouseWheelForward:Connect(function()
+	options.CanvasPosition = Vector2.new(0, options.CanvasPosition.Y - 40)
+end)
+
+frame.MouseWheelBackward:Connect(function()
+	options.CanvasPosition = Vector2.new(0, options.CanvasPosition.Y + 40)
+end)
+
+-- Enable Disable
+miniButton.MouseButton1Click:Connect(function()
+	if windowMinimized then
+		windowMinimized = false
+		
+		options.Visible = true
+		frame.Size = UDim2.new(0, windowWidth, 0, windowHeight)
+	else
+		windowMinimized = true
+		
+		options.Visible = false
+		frame.Size = UDim2.new(0, windowWidth, 0, 18)
+		
+		localPlayer.CameraMinZoomDistance = original_CamMinZoom
+		localPlayer.CameraMaxZoomDistance = original_CamMaxZoom
+	end
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+	scriptEnabled = false
+end)
+
+-- Script
+local step = 0
+local lastTick = tick()
+
+local dt = 1 / 60
+
+while true do
+	if scriptEnabled then
+		step = step + 1
+		
+		local refreshRateValue = TextToNumber(option_ESP_Line_RefreshRate_Value.Text)
+		local esp_RefreshRate = refreshRateValue / 1000
+		
+		-- Enable Backpack even when holding printers(not specifically)
+		game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		
+		-- ESP
+		if tick() - lastTick > esp_RefreshRate then
+			for _, v in pairs(tempStorage:GetChildren()) do
+				v:Destroy()
+			end
+					
+			if option_ESP_Enabled_Slider.GetValue() == "True" then
+				-- ESP
+				local profiles = {}
+				
+				-- Players
+				for _, plr in pairs(game.Players:GetPlayers()) do
+					if plr.Character and plr.Name ~= localPlayer.Name then
+						if plr.Character:FindFirstChild("Humanoid") then
+							local checked = true
+							
+							if plr.Character.Humanoid.Health <= 0 then
+								checked = false
+							end
+							
+							if option_TeamCheckEnabled_Slider.GetValue() == "True" then
+								if plr.TeamColor == localPlayer.TeamColor then
+									checked = false
+								end
+							end
+							
+							if checked then
+								local profile = {}
+								profile.Name = plr.Name
+								profile.Parts = plr.Character:GetDescendants()
+								profile.Model = plr.Character
+								
+								profile.AdditionalText = ""
+								profile.Type = "Player"
+								
+								-- Filtering
+								table.insert(profiles, profile)
+							end
+						end
+					end
+				end
+				
+				-- ESP
+				for _, profile in pairs(profiles) do
+					-- Char Info
+					local profile_Name = profile.Name
+					local profile_Model = profile.Model
+					local profile_Parts = profile.Parts
+					local profile_Type = profile.Type
+					
+					local profile_BasepartsCount = 0
+					
+					
+					if profile_Parts then
+						for _, x in pairs(profile_Parts) do
+							if x:IsA("BasePart") then
+								profile_BasepartsCount = profile_BasepartsCount + 1
+							end
+						end
+					end
+					
+					local BB_Position, BB_Size = profile_Model:GetBoundingBox()
+					BB_Size = BB_Size / 2
+					
+					local distanceToProfile = (BB_Position.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
+					
+					
+					-- ESP
+					if option_ESP_Tracers_Enabled_Slider.GetValue() == "True" then
+						if localPlayer.Character then
+							local xSize = workspace.CurrentCamera.ViewportSize.X
+							local ySize = workspace.CurrentCamera.ViewportSize.Y - 36
+							
+							local p1 = workspace.CurrentCamera:WorldToScreenPoint(workspace.CurrentCamera:ScreenPointToRay(xSize / 2, ySize).Origin)
+							local p2, onScreen = workspace.CurrentCamera:WorldToScreenPoint(BB_Position.Position)
+							
+							p1 = Vector2.new(p1.X, p1.Y)
+							p2 = Vector2.new(p2.X, p2.Y)
+							
+							if onScreen then
+								local v = p2 - p1
+								local v2 = v / 2
+								
+								local line = Instance.new("Frame", tempStorage)
+								line.Name = "Line"
+								line.BackgroundColor3 = Color3.new(1, 1, 1)
+								line.BackgroundTransparency = 0.4
+								line.BorderSizePixel = 0
+								line.Size = UDim2.new(0, v.Magnitude + 1, 0, 1) -- LAST VALUE IS THICKNESS
+								line.Position = UDim2.new(((p1.X + (v.X / 2)) - (line.AbsoluteSize.X / 2)) / xSize, 0, 
+														  ((p1.Y + (v.Y / 2)) - (line.AbsoluteSize.Y / 2)) / ySize, 0)
+								line.Rotation = math.deg(math.atan2(v.Y, v.X))
+							end
+						end
+					end
+					
+					local p1 = workspace.CurrentCamera:WorldToScreenPoint(BB_Position.Position)
+					local p2 = Vector2.new(p1.X, -math.huge)
+					
+					local s = BB_Size
+					
+					-- ESP Hitbox
+					local min = Vector2.new(math.huge, math.huge)
+					local max = Vector2.new(-math.huge, -math.huge)
+					
+					local t = {}
+					local totalOnScreen = true
+					
+					local c1 = BB_Position * CFrame.new(s.X, s.Y, s.Z).Position
+					local c2 = BB_Position * CFrame.new(-s.X, s.Y, s.Z).Position
+					local c3 = BB_Position * CFrame.new(-s.X, s.Y, -s.Z).Position
+					local c4 = BB_Position * CFrame.new(s.X, s.Y, -s.Z).Position
+					
+					local c5 = BB_Position * CFrame.new(s.X, -s.Y, s.Z).Position
+					local c6 = BB_Position * CFrame.new(-s.X, -s.Y, s.Z).Position
+					local c7 = BB_Position * CFrame.new(-s.X, -s.Y, -s.Z).Position
+					local c8 = BB_Position * CFrame.new(s.X, -s.Y, -s.Z).Position
+					
+					t = {c1, c2, c3, c4, c5, c6, c7, c8}
+					
+					for _, v in pairs(t) do
+						local pos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(v)
+						
+						min = Vector2.new(math.min(min.X, pos.X), math.min(min.Y, pos.Y))
+						max = Vector2.new(math.max(max.X, pos.X), math.max(max.Y, pos.Y))
+						
+						if onScreen == false then
+							totalOnScreen = false
+						end
+					end
+					
+					if totalOnScreen then
+						local size = max - min
+						local center = (max + min) / 2
+						
+						local box = espHitboxImage_Template:Clone()
+						box.Parent = tempStorage
+						box.Size = UDim2.new(0, size.X, 0, size.Y)
+						box.Position = UDim2.new(0, center.X, 0, center.Y)
+						box.ImageColor3 = Color3.new(1, 1, 1)
+						box.ImageTransparency = 0
+						box.SliceScale = 1 / 4 -- SYNTAX: [THICKNESS] / 4
+					end
+					
+					-- Stats
+					if option_ESP_NameTag_Slider.GetValue() == "True" then
+						local onScreenTotal = true
+						
+						for _, v in pairs(t) do
+							local pos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(v)
+							p2 = Vector2.new(p1.X, math.max(p2.Y, pos.Y))
+							
+							if onScreen == false then
+								onScreenTotal = false
+							end
+						end
+						
+						if onScreenTotal then
+							p2 = p2 + Vector2.new(0, 10)
+							
+							local label = Instance.new("TextLabel", tempStorage)
+							label.Name = "NameLabel"
+							label.BackgroundTransparency = 1
+							label.Active = false
+							label.AnchorPoint = Vector2.new(0.5, 0.5)
+							label.Font = Enum.Font.GothamSemibold
+							label.TextColor3 = Color3.new(1, 1, 1)
+							label.TextSize = 9
+							
+							local addText = profile.AdditionalText ~= nil and profile.AdditionalText or ""
+							
+							label.Text = "[ " .. profile_Name .. " ][ " .. math.floor(distanceToProfile) .. " studs ]" .. addText
+							
+							label.Size = UDim2.new(0, 500, 0, 20)
+							label.Position = UDim2.new(0, p2.X, 0, p2.Y)
+							
+							if profile.TextColor ~= nil then
+								label.TextColor3 = profile.TextColor
+							else
+								label.TextColor3 = Color3.new(1, 1, 1)
+							end
+						end
+					end
+				end
+				
+				lastTick = tick()
+			end
+			
+			-- Aim
+			if option_AimbotEnabled_Slider.GetValue() == "True" and aimbotEnabled then
+				local closestPart = nil
+				local closestDistance = math.huge
+				
+				for _, p in pairs(game.Players:GetPlayers()) do
+					if p.Character and p.Name ~= localPlayer.Name then
+						if p.Character:FindFirstChild("Humanoid") then
+							if p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then
+								local checked = true
+								
+								if option_TeamCheckEnabled_Slider.GetValue() == "True" then
+									if p.TeamColor == localPlayer.TeamColor then
+										checked = false
+									end
+								end
+								
+								if checked then
+									local camPos = workspace.CurrentCamera.CFrame.Position
+									local targetPart = p.Character.Head
+									
+									local a = workspace.CurrentCamera.CFrame.LookVector
+									local b = -CFrame.new(workspace.CurrentCamera.CFrame.Position, targetPart.Position).LookVector
+									
+									local d = a:Dot(b)
+									
+									if d < closestDistance then
+										closestDistance = d
+										closestPart = targetPart
+									end
+								end
+							end
+						end
+					end
+				end
+				
+				if closestPart then
+					workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, closestPart.Position)
+				end
+			end
+		end
+		
+		dt = game:GetService("RunService").RenderStepped:Wait()
+	else
+		gui:Destroy()
+		espGui:Destroy()
+		
+		game:GetService("ContextActionService"):BindActionAtPriority("WASDKeys", function() return Enum.ContextActionResult.Pass end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.LeftShift, Enum.KeyCode.Space)
+		
+		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+		
+		localPlayer.CameraMinZoomDistance = original_CamMinZoom
+		localPlayer.CameraMaxZoomDistance = original_CamMaxZoom
+		
+		break
+	end
+end
