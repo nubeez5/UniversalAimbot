@@ -854,8 +854,8 @@ while true do
 				
 				for _, p in pairs(game.Players:GetPlayers()) do
 					if p.Character and p.Name ~= localPlayer.Name then
-						if p.Character:FindFirstChild("Humanoid") then
-							if p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then
+						if p.Character:FindFirstChild("Humanoid") and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Head") then
+							if p.Character.Humanoid.Health > 0 then
 								local checked = true
 								
 								if option_TeamCheckEnabled_Slider.GetValue() == "True" then
