@@ -647,9 +647,7 @@ end)
 local step = 0
 local lastTick = tick()
 
-local dt = 1 / 60
-
-while true do
+local function Calculate()
 	if scriptEnabled then
 		step = step + 1
 		
@@ -843,8 +841,6 @@ while true do
 						end
 					end
 				end
-				
-				lastTick = tick()
 			end
 			
 			-- Aim
@@ -888,8 +884,6 @@ while true do
 				end
 			end
 		end
-		
-		dt = game:GetService("RunService").RenderStepped:Wait()
 	else
 		gui:Destroy()
 		espGui:Destroy()
@@ -900,7 +894,9 @@ while true do
 		
 		localPlayer.CameraMinZoomDistance = original_CamMinZoom
 		localPlayer.CameraMaxZoomDistance = original_CamMaxZoom
-		
-		break
 	end
+	
+	lastTick = tick()
 end
+
+game:GetService("RunService"):BindToRenderStep("Calculate", Enum.RenderPriority.Camera.Value - 1, Calculate)
