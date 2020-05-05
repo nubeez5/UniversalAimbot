@@ -3,7 +3,7 @@ local windowMinimized = false
 local windowWidth = 350
 local windowHeight = 230
 
-local guiParent = game.Players.LocalPlayer.PlayerGui
+local guiParent = game.CoreGui
 
 
 -- Keybinds
@@ -16,7 +16,7 @@ local aimbot_Key = Enum.KeyCode.C
 
 
 -- Other Variables
-local localPlayer = game.CoreGui
+local localPlayer = game.Players.LocalPlayer
 local rng = Random.new()
 
 local inputService = game:GetService("UserInputService")
