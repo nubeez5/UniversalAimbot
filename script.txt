@@ -3,11 +3,11 @@ local windowMinimized = false
 local windowWidth = 350
 local windowHeight = 230
 
-local guiParent = game.CoreGui
+local guiParent = game.Players.LocalPlayer.PlayerGui
 
 
 -- Keybinds
-local aimbot_Key = Enum.KeyCode.LeftControl
+local aimbot_Key = Enum.KeyCode.C
 
 
 
@@ -16,7 +16,7 @@ local aimbot_Key = Enum.KeyCode.LeftControl
 
 
 -- Other Variables
-local localPlayer = game.Players.LocalPlayer
+local localPlayer = game.CoreGui
 local rng = Random.new()
 
 local inputService = game:GetService("UserInputService")
@@ -24,6 +24,14 @@ local inputService = game:GetService("UserInputService")
 
 local original_CamMinZoom = 0
 local original_CamMaxZoom = 1024
+
+
+local previous_FreecamEnabled = false
+
+local freecamVelocity = Vector3.new(0, 0, 0)
+local freecamRotation = Vector2.new(0, 0)
+
+local freecamEngaged = false
 
 -- States
 local scriptEnabled = true
@@ -509,19 +517,6 @@ local function ToggleOptionEvent(button, value)
 	end)
 end
 
--- Aim
-inputService.InputBegan:Connect(function(key)
-	if key.KeyCode == aimbot_Key then
-		aimbotEnabled = true
-	end
-end)
-
-inputService.InputEnded:Connect(function(key)
-	if key.KeyCode == aimbot_Key then
-		aimbotEnabled = false
-	end
-end)
-
 
 
 
@@ -560,6 +555,24 @@ local option_AimbotEnabled_Slider = CreateSlider(option_AimbotEnabled, 130, 205,
 local option_TeamCheckEnabled = CreateOption(options, "ESP_TeamCheck", "Team Check Enabled")
 local option_TeamCheckEnabled_Slider = CreateSlider(option_TeamCheckEnabled, 130, 205, "True", "False", false)
 
+---- Freecam
+AddPadding(options, 4, "")
+AddPadding(options, 14, "Freecam")
+
+-- Freecam Enable
+local option_Freecam = CreateOption(options, "Freecam", "Freecam Enabled")
+local option_Freecam_Toggle = CreateSlider(option_Freecam, 130, 205, "True", "False", false)
+
+-- Freecam Speed
+local option_Freecam_Speed = CreateOption(options, "Freecam_Speed", "Speed")
+local option_Freecam_Speed_Value = CreateValue(option_Freecam_Speed, 130, 205)
+
+option_Freecam_Speed_Value.Text = 100
+
+-- Teleport Here
+local option_Freecam_TeleportHereButton = CreateOption(options, "Freecam_TeleportHere", "Teleport Here")
+CreateButton(option_Freecam_TeleportHereButton, 130, 205, "Teleport", TeleportToCamera)
+
 
 -- Extra Info
 AddPadding(options, 40, "")
@@ -588,6 +601,59 @@ end)
 
 dragHandle.MouseButton1Up:Connect(function()
 	dragging = false
+end)
+
+-- Aim
+inputService.InputBegan:Connect(function(input)
+	if option_Freecam_Toggle.GetValue() == "True" then
+		if input.KeyCode == Enum.KeyCode.W then
+			freecamVelocity = freecamVelocity + Vector3.new(0, 0, -1)
+		elseif input.KeyCode == Enum.KeyCode.S then
+			freecamVelocity = freecamVelocity + Vector3.new(0, 0, 1)
+		elseif input.KeyCode == Enum.KeyCode.A then
+			freecamVelocity = freecamVelocity + Vector3.new(-1, 0, 0)
+		elseif input.KeyCode == Enum.KeyCode.D then
+			freecamVelocity = freecamVelocity + Vector3.new(1, 0, 0)
+		elseif input.KeyCode == Enum.KeyCode.Space then
+			freecamVelocity = freecamVelocity + Vector3.new(0, 1, 0)
+		elseif input.KeyCode == Enum.KeyCode.LeftShift then
+			freecamVelocity = freecamVelocity + Vector3.new(0, -1, 0)
+		end
+	end
+	
+	if input.KeyCode == aimbot_Key then
+		aimbotEnabled = true
+	end
+	
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		freecamEngaged = true
+	end
+end)
+
+inputService.InputEnded:Connect(function(input)
+	if option_Freecam_Toggle.GetValue() == "True" then
+		if input.KeyCode == Enum.KeyCode.W then
+			freecamVelocity = freecamVelocity - Vector3.new(0, 0, -1)
+		elseif input.KeyCode == Enum.KeyCode.S then
+			freecamVelocity = freecamVelocity - Vector3.new(0, 0, 1)
+		elseif input.KeyCode == Enum.KeyCode.A then
+			freecamVelocity = freecamVelocity - Vector3.new(-1, 0, 0)
+		elseif input.KeyCode == Enum.KeyCode.D then
+			freecamVelocity = freecamVelocity - Vector3.new(1, 0, 0)
+		elseif input.KeyCode == Enum.KeyCode.Space then
+			freecamVelocity = freecamVelocity - Vector3.new(0, 1, 0)
+		elseif input.KeyCode == Enum.KeyCode.LeftShift then
+			freecamVelocity = freecamVelocity - Vector3.new(0, -1, 0)
+		end
+	end
+	
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		freecamEngaged = false
+	end
+	
+	if input.KeyCode == aimbot_Key then
+		aimbotEnabled = false
+	end
 end)
 
 -- Mouse Icon
@@ -884,6 +950,51 @@ local function Calculate()
 				end
 			end
 		end
+		
+		-- Freecam
+		local freecamEnabled = option_Freecam_Toggle.GetValue()
+		local cam = workspace.CurrentCamera
+		
+		if previous_FreecamEnabled ~= freecamEnabled then
+			-- State Changed
+			
+			if freecamEnabled == "False" then
+				freecamVelocity = Vector3.new(0, 0, 0)
+				cam.CameraType = Enum.CameraType.Custom
+				
+				game:GetService("ContextActionService"):BindActionAtPriority("WASDKeys", function() return Enum.ContextActionResult.Pass end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.LeftShift, Enum.KeyCode.Space)
+			elseif freecamEnabled == "True" then
+				local c = cam.CFrame
+				cam.CameraType = Enum.CameraType.Scriptable
+				cam.CFrame = c
+				
+				game:GetService("ContextActionService"):BindActionAtPriority("WASDKeys", function() return Enum.ContextActionResult.Sink end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.LeftShift, Enum.KeyCode.Space)
+			end
+		end
+		
+		if freecamEnabled == "True" then
+			if freecamEngaged then
+				inputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+				
+				local delta = inputService:GetMouseDelta()
+				local sens = inputService.MouseDeltaSensitivity
+				
+				local x = delta.X * (sens * sens * 15)
+				local y = delta.Y * (sens * sens * 15)
+				
+				freecamRotation = freecamRotation + Vector2.new(math.rad(x), math.rad(y))
+			else
+				inputService.MouseBehavior = Enum.MouseBehavior.Default
+			end
+			
+			
+			local speed = TextToNumber(option_Freecam_Speed_Value.Text)
+			
+			cam.CFrame = cam.CFrame * CFrame.new(freecamVelocity.Unit * (tick() - lastTick) * speed)
+			cam.CFrame = CFrame.new(cam.CFrame.Position) * CFrame.fromOrientation(-math.rad(freecamRotation.Y), -math.rad(freecamRotation.X), 0)
+		end
+		
+		previous_FreecamEnabled = freecamEnabled
 	else
 		gui:Destroy()
 		espGui:Destroy()
