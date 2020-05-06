@@ -770,7 +770,7 @@ local function Calculate()
 								profile.Parts = plr.Character:GetDescendants()
 								profile.Model = plr.Character
 								
-								profile.AdditionalText = ""
+								profile.AdditionalText = "[ " .. math.floor(plr.Character.Humanoid.Health) .. "/" .. math.floor(plr.Character.Humanoid.MaxHealth) .. " ]"
 								profile.Type = "Player"
 								
 								-- Filtering
