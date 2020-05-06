@@ -7,7 +7,7 @@ local guiParent = game.CoreGui
 
 
 -- Keybinds
-local aimbot_Key = Enum.KeyCode.C
+local aimbot_Key = Enum.KeyCode.LeftControl
 
 
 
@@ -569,9 +569,15 @@ local option_Freecam_Speed_Value = CreateValue(option_Freecam_Speed, 130, 205)
 
 option_Freecam_Speed_Value.Text = 100
 
--- Teleport Here
 local option_Freecam_TeleportHereButton = CreateOption(options, "Freecam_TeleportHere", "Teleport Here")
 CreateButton(option_Freecam_TeleportHereButton, 130, 205, "Teleport", TeleportToCamera)
+
+-- Noclip
+AddPadding(options, 4, "")
+AddPadding(options, 14, "Noclip")
+
+local option_Noclip = CreateOption(options, "Noclip", "Noclip Enabled")
+local option_Noclip_Toggle = CreateSlider(option_Noclip, 130, 205, "True", "False", false)
 
 
 -- Extra Info
@@ -719,6 +725,15 @@ local function Calculate()
 		
 		local refreshRateValue = TextToNumber(option_ESP_Line_RefreshRate_Value.Text)
 		local esp_RefreshRate = refreshRateValue / 1000
+		
+		-- Noclip
+		if option_Noclip_Toggle.GetValue() == "True" then
+			if localPlayer.Character then
+				if localPlayer.Character:FindFirstChild("Humanoid") then
+					localPlayer.Character.Humanoid:ChangeState(11)
+				end
+			end
+		end
 		
 		-- Enable Backpack even when holding printers(not specifically)
 		game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
