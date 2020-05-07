@@ -735,9 +735,6 @@ local function Calculate()
 			end
 		end
 		
-		-- Enable Backpack even when holding printers(not specifically)
-		game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
-		
 		-- ESP
 		if tick() - lastTick > esp_RefreshRate then
 			for _, v in pairs(tempStorage:GetChildren()) do
