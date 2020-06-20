@@ -531,7 +531,7 @@ local option_ESP_Enabled = CreateOption(options, "ESP_Enabled", "Enabled")
 local option_ESP_Enabled_Slider = CreateSlider(option_ESP_Enabled, 130, 205, "True", "False", false)
 
 local option_ESP_FasterHitbox = CreateOption(options, "ESP_Enabled", "Faster ESP For Players")
-local option_ESP_FasterHitbox_Slider = CreateSlider(option_ESP_FasterHitbox, 130, 205, "True", "False", false)
+local option_ESP_FasterHitbox_Slider = CreateSlider(option_ESP_FasterHitbox, 130, 205, "True", "False", true)
 
 
 -- Refresh Rate
