@@ -530,6 +530,10 @@ AddPadding(options, 14, "ESP")
 local option_ESP_Enabled = CreateOption(options, "ESP_Enabled", "Enabled")
 local option_ESP_Enabled_Slider = CreateSlider(option_ESP_Enabled, 130, 205, "True", "False", false)
 
+local option_ESP_FasterHitbox = CreateOption(options, "ESP_Enabled", "Faster ESP For Players")
+local option_ESP_FasterHitbox_Slider = CreateSlider(option_ESP_FasterHitbox, 130, 205, "True", "False", false)
+
+
 -- Refresh Rate
 AddPadding(options, 4, "")
 
@@ -735,6 +739,9 @@ local function Calculate()
 			end
 		end
 		
+		-- Enable Backpack even when holding printers(not specifically)
+		game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		
 		-- ESP
 		if tick() - lastTick > esp_RefreshRate then
 			for _, v in pairs(tempStorage:GetChildren()) do
@@ -762,10 +769,33 @@ local function Calculate()
 							end
 							
 							if checked then
+								if not plr.Character:FindFirstChild("ESP_Hitbox_Model") then
+									local model = Instance.new("Model", plr.Character)
+									model.Name = "ESP_Hitbox_Model"
+									
+									local box = Instance.new("Part", model)
+									box.Name = "ESP_Hitbox"
+									box.Size = Vector3.new(4, 5, 2)
+									box.CFrame = plr.Character.HumanoidRootPart.CFrame * CFrame.new(0, -0.25, 0)
+									box.Transparency = 1
+									box.CanCollide = false
+									box.Massless = true
+									
+									local weld = Instance.new("WeldConstraint", box)
+									weld.Part0 = plr.Character.HumanoidRootPart
+									weld.Part1 = box
+								end
+								
 								local profile = {}
 								profile.Name = plr.Name
-								profile.Parts = plr.Character:GetDescendants()
-								profile.Model = plr.Character
+								
+								if option_ESP_FasterHitbox_Slider.GetValue() == "True" then
+									profile.Model = plr.Character.ESP_Hitbox_Model
+									profile.Parts = {plr.Character.ESP_Hitbox_Model.ESP_Hitbox}
+								else
+									profile.Model = plr.Character
+									profile.Parts = plr.Character:GetDescendants()
+								end
 								
 								profile.AdditionalText = "[ " .. math.floor(plr.Character.Humanoid.Health) .. "/" .. math.floor(plr.Character.Humanoid.MaxHealth) .. " ]"
 								profile.Type = "Player"
